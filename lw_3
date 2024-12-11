@@ -125,12 +125,21 @@ void keyboard(unsigned char key, int x, int y) {
             paused = !paused;
             break;
         case GLUT_KEY_UP: // Стрелка вверх - увеличение скорости
-            animationSpeed += 0.01f;
+            animationSpeed += 0.005f;
             break;
         case GLUT_KEY_DOWN: // Стрелка вниз - уменьшение скорости
-            animationSpeed = fmax(0.001f, animationSpeed - 0.01f); // скорость не может быть отрицательной
+            animationSpeed = fmax(0.001f, animationSpeed - 0.005f);
             break;
-
+        case '1': // 1 - переход в начальную точку
+            animationTime = 0.0f;
+            forward = true;
+            glutPostRedisplay();
+            break;
+        case '2': // 2 - переход в конечную точку
+            animationTime = animationDuration;
+            forward = false;
+            glutPostRedisplay();
+            break;
     }
 }
 
@@ -169,8 +178,8 @@ int main(int argc, char** argv) {
 
     startTime = glutGet(GLUT_ELAPSED_TIME); // Запоминаем время запуска
 
-    glutKeyboardFunc(keyboard);
-    glutSpecialFunc(specialKeyboard); //Обработка специальных клавиш
+   glutKeyboardFunc(keyboard);
+    glutSpecialFunc(specialKeyboard);
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutTimerFunc(33, update, 0);
