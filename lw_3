@@ -8,6 +8,8 @@ float startTime = 0;
 GLfloat animationTime = 0.0f;
 const GLfloat animationDuration = 5.0f;
 bool forward = true;
+GLfloat animationSpeed = 0.033f; // скорость анимации (примерно 30 FPS)
+bool paused = false; // флаг паузы
 
 // Определяем начальную и конечную точки как переменные
 const GLfloat startX = 0.0f;
@@ -114,18 +116,42 @@ void timer(int value) {
     glutTimerFunc(33, timer, 0); // 33 мс ≈ 30 FPS
 }
 
+void keyboard(unsigned char key, int x, int y) {
+    switch (key) {
+        case 27: // ESC - выход
+            exit(0);
+            break;
+        case ' ': // Пробел - пауза/возобновление
+            paused = !paused;
+            break;
+        case GLUT_KEY_UP: // Стрелка вверх - увеличение скорости
+            animationSpeed += 0.01f;
+            break;
+        case GLUT_KEY_DOWN: // Стрелка вниз - уменьшение скорости
+            animationSpeed = fmax(0.001f, animationSpeed - 0.01f); // скорость не может быть отрицательной
+            break;
+
+    }
+}
+
+void specialKeyboard(int key, int x, int y) {
+  keyboard((unsigned char)key,x,y); // Обработка специальных клавиш
+}
+
 void update(int value) {
-    if (forward) {
-        animationTime += 0.033f;
-        if (animationTime >= animationDuration) {
-            animationTime = animationDuration; // останавливаемся в конце
-            forward = false;
-        }
-    } else {
-        animationTime -= 0.033f;
-        if (animationTime <= 0.0f) {
-            animationTime = 0.0f;  // останавливаемся в начале
-            forward = true;
+    if (!paused) {
+        if (forward) {
+            animationTime += animationSpeed;
+            if (animationTime >= animationDuration) {
+                animationTime = animationDuration;
+                forward = false;
+            }
+        } else {
+            animationTime -= animationSpeed;
+            if (animationTime <= 0.0f) {
+                animationTime = 0.0f;
+                forward = true;
+            }
         }
     }
     glutPostRedisplay();
@@ -143,6 +169,8 @@ int main(int argc, char** argv) {
 
     startTime = glutGet(GLUT_ELAPSED_TIME); // Запоминаем время запуска
 
+    glutKeyboardFunc(keyboard);
+    glutSpecialFunc(specialKeyboard); //Обработка специальных клавиш
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutTimerFunc(33, update, 0);
