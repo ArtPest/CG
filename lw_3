@@ -1,0 +1,151 @@
+#include <GL/freeglut.h>
+#include <GL/gl.h>
+#include <cstdio>
+#include <cmath>
+
+// ... (функции drawCube и reshape остаются без изменений) ...
+float startTime = 0;
+GLfloat animationTime = 0.0f;
+const GLfloat animationDuration = 5.0f;
+bool forward = true;
+
+// Определяем начальную и конечную точки как переменные
+const GLfloat startX = 0.0f;
+const GLfloat startY = 0.0f;
+const GLfloat startZ = 5.0f;
+
+const GLfloat endX = 5.0f;
+const GLfloat endY = 2.0f;
+const GLfloat endZ = 0.0f;
+
+// Функция для рисования куба
+void drawCube(double size) {
+    glPushMatrix();
+    glScalef(size, size, size); // Изменяем размер куба
+
+    glBegin(GL_QUADS);
+    glColor3f(0.0f, 0.0f, 0.5f);
+
+    // Передняя грань
+    glVertex3f(1.0, 1.0, 1.0);
+    glVertex3f(-1.0, 1.0, 1.0);
+    glVertex3f(-1.0, -1.0, 1.0);
+    glVertex3f(1.0, -1.0, 1.0);
+
+    // Задняя грань
+    glVertex3f(1.0, 1.0, -1.0);
+    glVertex3f(1.0, -1.0, -1.0);
+    glVertex3f(-1.0, -1.0, -1.0);
+    glVertex3f(-1.0, 1.0, -1.0);
+
+    // Правая грань
+    glVertex3f(1.0, 1.0, 1.0);
+    glVertex3f(1.0, -1.0, 1.0);
+    glVertex3f(1.0, -1.0, -1.0);
+    glVertex3f(1.0, 1.0, -1.0);
+
+    // Левая грань
+    glVertex3f(-1.0, 1.0, 1.0);
+    glVertex3f(-1.0, 1.0, -1.0);
+    glVertex3f(-1.0, -1.0, -1.0);
+    glVertex3f(-1.0, -1.0, 1.0);
+
+    // Верхняя грань
+    glVertex3f(1.0, 1.0, 1.0);
+    glVertex3f(1.0, 1.0, -1.0);
+    glVertex3f(-1.0, 1.0, -1.0);
+    glVertex3f(-1.0, 1.0, 1.0);
+
+    // Нижняя грань
+    glVertex3f(1.0, -1.0, 1.0);
+    glVertex3f(-1.0, -1.0, 1.0);
+    glVertex3f(-1.0, -1.0, -1.0);
+    glVertex3f(1.0, -1.0, -1.0);
+
+    glEnd();
+
+    glPopMatrix();
+}
+
+
+
+void display() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // Белый фон
+
+    glLoadIdentity();
+
+    GLfloat t;
+    t = animationTime / animationDuration; // Движение назад
+
+    GLfloat cameraX = (1 - t) * startX + t * endX;
+    GLfloat cameraY = (1 - t) * startY + t * endY;
+    GLfloat cameraZ = (1 - t) * startZ + t * endZ;
+
+    gluLookAt(cameraX, cameraY, cameraZ, 0, 0, 0, 0, 1, 0);
+
+    // Рисуем куб
+    drawCube(1.0);  // Размер куба 1.0
+
+
+    // Рисуем второй куб, смещенный
+    glPushMatrix();
+    glTranslatef(2.0, 1.0, 0.0);
+    glRotatef(45, 1, 1, 0); // Поворот второго куба
+    drawCube(0.5);  // Размер 0.5
+    glPopMatrix();
+
+    glFlush();
+    glutSwapBuffers();
+    glutPostRedisplay();
+}
+
+
+void reshape(int width, int height) {
+    glViewport(0, 0, width, height);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60.0, (double)width / height, 0.1, 100.0);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+void timer(int value) {
+    glutPostRedisplay();
+    glutTimerFunc(33, timer, 0); // 33 мс ≈ 30 FPS
+}
+
+void update(int value) {
+    if (forward) {
+        animationTime += 0.033f;
+        if (animationTime >= animationDuration) {
+            animationTime = animationDuration; // останавливаемся в конце
+            forward = false;
+        }
+    } else {
+        animationTime -= 0.033f;
+        if (animationTime <= 0.0f) {
+            animationTime = 0.0f;  // останавливаемся в начале
+            forward = true;
+        }
+    }
+    glutPostRedisplay();
+    glutTimerFunc(33, update, 0);
+}
+
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(640, 480);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Моя 3D сцена");
+
+    glEnable(GL_DEPTH_TEST);
+
+    startTime = glutGet(GLUT_ELAPSED_TIME); // Запоминаем время запуска
+
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutTimerFunc(33, update, 0);
+    glutMainLoop();
+    return 0;
+}
