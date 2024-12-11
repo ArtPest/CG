@@ -1,0 +1,319 @@
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <iostream>
+#include <vector>
+
+GLuint shaderProgram;
+GLuint VAO[3], VBO[3], EBO[3]; // Отдельные VAO, VBO, EBO для каждой фигуры
+
+// Вершинный шейдер (остается без изменений)
+const char* vertexShaderSource = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+
+out vec3 FragPos;
+out vec3 Normal;
+out vec3 LightDir;
+out vec3 GouraudColor;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform mat3 normalMatrix;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 objectColor;
+uniform bool useFlatShading;
+
+void main()
+{
+    FragPos = vec3(model * vec4(aPos, 1.0));
+    Normal = normalMatrix * aNormal;
+    LightDir = normalize(lightPos - FragPos);
+
+    if (!useFlatShading) {
+        float diff = max(dot(normalize(Normal), LightDir), 0.0);
+        GouraudColor = diff * lightColor * objectColor;
+    }
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+}
+)";
+
+// Фрагментный шейдер (остается без изменений)
+const char* fragmentShaderSource = R"(
+#version 330 core
+out vec4 FragColor;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec3 LightDir;
+in vec3 GouraudColor;
+
+uniform vec3 lightColor;
+uniform vec3 objectColor;
+uniform bool useFlatShading;
+uniform vec3 ambientLight;
+
+void main()
+{
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(LightDir);
+
+    if (useFlatShading) {
+        float diff = max(dot(norm, lightDir), 0.0);
+        vec3 flatColor = diff * lightColor * objectColor;
+        FragColor = vec4(flatColor + ambientLight * objectColor, 1.0);
+    } else {
+        FragColor = vec4(GouraudColor + ambientLight * objectColor, 1.0);
+    }
+}
+)";
+
+
+// Данные для куба
+float cubeVertices[] = {
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+};
+
+// Данные для сферы (упрощенное приближение)
+std::vector<float> sphereVertices;
+std::vector<unsigned int> sphereIndices;
+
+void createSphere(unsigned int rings, unsigned int sectors) {
+    float radius = 0.5f;
+    float R = radius;
+    float PI = acos(-1.0);
+
+    for (int i = 0; i <= rings; ++i) {
+        float y = sin(-PI / 2 + PI * i / rings);
+        float r = cos(-PI / 2 + PI * i / rings);
+
+        for (int j = 0; j <= sectors; ++j) {
+            float x = r * sin(2 * PI * j / sectors);
+            float z = r * cos(2 * PI * j / sectors);
+
+            sphereVertices.push_back(x * R);
+            sphereVertices.push_back(y * R);
+            sphereVertices.push_back(z * R);
+            sphereVertices.push_back(x);
+            sphereVertices.push_back(y);
+            sphereVertices.push_back(z);
+
+
+        }
+    }
+     for (int i = 0; i < rings; ++i) {
+        for (int j = 0; j < sectors; ++j) {
+            int a = i * (sectors + 1) + j;
+            int b = a + 1;
+            int c = (i + 1) * (sectors + 1) + j;
+            int d = c + 1;
+
+            sphereIndices.push_back(a);
+            sphereIndices.push_back(b);
+            sphereIndices.push_back(c);
+
+            sphereIndices.push_back(c);
+            sphereIndices.push_back(b);
+            sphereIndices.push_back(d);
+        }
+    }
+}
+
+// Данные для пирамиды
+float pyramidVertices[] = {
+    0.0f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // Вершина
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, // Основание
+    0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, // Основание
+    0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, // Основание
+    -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f  // Основание
+};
+unsigned int pyramidIndices[] = {
+    0, 1, 2, // Передняя грань
+    0, 2, 3, // Правая грань
+    0, 3, 4, // Задняя грань
+    0, 4, 1  // Левая грань
+};
+
+void init() {
+    glewInit();
+
+    // Компиляция и линковка шейдеров
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+
+    shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    // Настройка буферов для куба
+    glGenVertexArrays(1, &VAO[0]);
+    glGenBuffers(1, &VBO[0]);
+    glBindVertexArray(VAO[0]);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    createSphere(20, 20); // Создаем сферу
+
+    glGenVertexArrays(1, &VAO[1]);
+    glGenBuffers(2, &VBO[1]);
+    glGenBuffers(1, &EBO[1]);
+
+    glBindVertexArray(VAO[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+    glBufferData(GL_ARRAY_BUFFER, sphereVertices.size() * sizeof(float), &sphereVertices[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[1]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphereIndices.size() * sizeof(unsigned int), &sphereIndices[0], GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // Настройка буферов для пирамиды
+    glGenVertexArrays(1, &VAO[2]);
+    glGenBuffers(1, &VBO[2]);
+    glGenBuffers(1, &EBO[2]);
+
+    glBindVertexArray(VAO[2]);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO[2]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pyramidVertices), pyramidVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[2]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(pyramidIndices), pyramidIndices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glEnable(GL_DEPTH_TEST);
+}
+
+void display() {
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glm::mat4 view = glm::lookAt(glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+    glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+    glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+    glm::vec3 ambientLight(0.2f, 0.2f, 0.2f);
+    bool useFlatShading = false;
+
+
+    glUseProgram(shaderProgram);
+    glUniform3fv(glGetUniformLocation(shaderProgram, "lightPos"), 1, glm::value_ptr(lightPos));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "lightColor"), 1, glm::value_ptr(lightColor));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "ambientLight"), 1, glm::value_ptr(ambientLight));
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform1i(glGetUniformLocation(shaderProgram, "useFlatShading"), useFlatShading);
+
+
+    // Отрисовка куба
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(-1.0f, 0.0f, 0.0f));
+    glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(view * model)));
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix3fv(glGetUniformLocation(shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "objectColor"), 1, glm::value_ptr(glm::vec3(1.0f, 0.0f, 0.0f)));
+    glBindVertexArray(VAO[0]);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+
+    // Отрисовка сферы
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(1.0f, 0.0f, 0.0f));
+    normalMatrix = glm::mat3(glm::transpose(glm::inverse(view * model)));
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix3fv(glGetUniformLocation(shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "objectColor"), 1, glm::value_ptr(glm::vec3(0.0f, 1.0f, 0.0f)));
+    glBindVertexArray(VAO[1]);
+    glDrawElements(GL_TRIANGLES, sphereIndices.size(), GL_UNSIGNED_INT, 0);
+
+
+    // Отрисовка пирамиды
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
+    normalMatrix = glm::mat3(glm::transpose(glm::inverse(view * model)));
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix3fv(glGetUniformLocation(shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "objectColor"), 1, glm::value_ptr(glm::vec3(0.0f, 0.0f, 1.0f)));
+    glBindVertexArray(VAO[2]);
+    glDrawElements(GL_TRIANGLES, sizeof(pyramidIndices)/sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+
+
+    glutSwapBuffers();
+}
+
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+    glutInitContextVersion(3, 3);
+    glutInitContextProfile(GLUT_CORE_PROFILE);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(800, 600);
+    glutCreateWindow("Lighting Scene");
+
+    init();
+
+    glutDisplayFunc(display);
+    glutMainLoop();
+
+    return 0;
+}
