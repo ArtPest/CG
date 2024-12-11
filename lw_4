@@ -8,6 +8,8 @@
 
 GLuint shaderProgram;
 GLuint VAO[3], VBO[3], EBO[3]; // Отдельные VAO, VBO, EBO для каждой фигуры
+bool light1Enabled = true; // Флаг для первого источника
+bool light2Enabled = true; // Флаг для второго источника
 
 // Вершинный шейдер (остается без изменений)
 const char* vertexShaderSource = R"(
@@ -17,15 +19,18 @@ layout (location = 1) in vec3 aNormal;
 
 out vec3 FragPos;
 out vec3 Normal;
-out vec3 LightDir;
+out vec3 LightDir1;
+out vec3 LightDir2;
 out vec3 GouraudColor;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 uniform mat3 normalMatrix;
-uniform vec3 lightPos;
-uniform vec3 lightColor;
+uniform vec3 lightPos1;
+uniform vec3 lightPos2;
+uniform vec3 lightColor1;
+uniform vec3 lightColor2;
 uniform vec3 objectColor;
 uniform bool useFlatShading;
 
@@ -33,11 +38,13 @@ void main()
 {
     FragPos = vec3(model * vec4(aPos, 1.0));
     Normal = normalMatrix * aNormal;
-    LightDir = normalize(lightPos - FragPos);
+    LightDir1 = normalize(lightPos1 - FragPos);
+    LightDir2 = normalize(lightPos2 - FragPos);
 
     if (!useFlatShading) {
-        float diff = max(dot(normalize(Normal), LightDir), 0.0);
-        GouraudColor = diff * lightColor * objectColor;
+        float diff1 = max(dot(normalize(Normal), LightDir1), 0.0);
+        float diff2 = max(dot(normalize(Normal), LightDir2), 0.0);
+        GouraudColor = diff1 * lightColor1 * objectColor + diff2 * lightColor2 * objectColor;
     }
     gl_Position = projection * view * model * vec4(aPos, 1.0);
 }
@@ -50,10 +57,12 @@ out vec4 FragColor;
 
 in vec3 FragPos;
 in vec3 Normal;
-in vec3 LightDir;
+in vec3 LightDir1;
+in vec3 LightDir2;
 in vec3 GouraudColor;
 
-uniform vec3 lightColor;
+uniform vec3 lightColor1;
+uniform vec3 lightColor2;
 uniform vec3 objectColor;
 uniform bool useFlatShading;
 uniform vec3 ambientLight;
@@ -61,11 +70,13 @@ uniform vec3 ambientLight;
 void main()
 {
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(LightDir);
+    vec3 lightDir1 = normalize(LightDir1);
+    vec3 lightDir2 = normalize(LightDir2);
 
     if (useFlatShading) {
-        float diff = max(dot(norm, lightDir), 0.0);
-        vec3 flatColor = diff * lightColor * objectColor;
+        float diff1 = max(dot(norm, lightDir1), 0.0);
+        float diff2 = max(dot(norm, lightDir2), 0.0);
+        vec3 flatColor = diff1 * lightColor1 * objectColor + diff2 * lightColor2 * objectColor;
         FragColor = vec4(flatColor + ambientLight * objectColor, 1.0);
     } else {
         FragColor = vec4(GouraudColor + ambientLight * objectColor, 1.0);
@@ -251,15 +262,22 @@ void display() {
 
     glm::mat4 view = glm::lookAt(glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-    glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-    glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+    
+    glm::vec3 lightPos1(1.2f, 1.0f, 2.0f);
+    glm::vec3 lightPos2(-1.2f, 2.0f, 1.0f);
+
+    glm::vec3 lightColor1 = light1Enabled ? glm::vec3(1.0f, 1.0f, 1.0f) : glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 lightColor2 = light2Enabled ? glm::vec3(1.0f, 0.5f, 0.0f) : glm::vec3(0.0f, 0.0f, 0.0f);
+
     glm::vec3 ambientLight(0.2f, 0.2f, 0.2f);
     bool useFlatShading = false;
 
 
     glUseProgram(shaderProgram);
-    glUniform3fv(glGetUniformLocation(shaderProgram, "lightPos"), 1, glm::value_ptr(lightPos));
-    glUniform3fv(glGetUniformLocation(shaderProgram, "lightColor"), 1, glm::value_ptr(lightColor));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "lightPos1"), 1, glm::value_ptr(lightPos1));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "lightPos2"), 1, glm::value_ptr(lightPos2));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "lightColor1"), 1, glm::value_ptr(lightColor1));
+    glUniform3fv(glGetUniformLocation(shaderProgram, "lightColor2"), 1, glm::value_ptr(lightColor2));
     glUniform3fv(glGetUniformLocation(shaderProgram, "ambientLight"), 1, glm::value_ptr(ambientLight));
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
@@ -302,6 +320,20 @@ void display() {
     glutSwapBuffers();
 }
 
+void keyboard(unsigned char key, int x, int y) {
+    switch (key) {
+        case '1':
+            light1Enabled = !light1Enabled;
+            glutPostRedisplay();
+            break;
+        case '2':
+            light2Enabled = !light2Enabled;
+            glutPostRedisplay();
+            break;
+        // ... другие обработчики клавиш ...
+    }
+}
+
 int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitContextVersion(3, 3);
@@ -311,6 +343,8 @@ int main(int argc, char** argv) {
     glutCreateWindow("Lighting Scene");
 
     init();
+
+    glutKeyboardFunc(keyboard); // Регистрируем обработчик клавиатуры
 
     glutDisplayFunc(display);
     glutMainLoop();
