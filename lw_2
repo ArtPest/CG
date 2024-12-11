@@ -1,0 +1,88 @@
+#include <GL/freeglut.h>
+#include <GL/gl.h>
+#include <cmath>
+
+// Define cube vertices
+GLfloat vertices[] = {
+    -1.0, -1.0, 1.0,
+    1.0, -1.0, 1.0,
+    1.0, 1.0, 1.0,
+    -1.0, 1.0, 1.0,
+    -1.0, -1.0, -1.0,
+    1.0, -1.0, -1.0,
+    1.0, 1.0, -1.0,
+    -1.0, 1.0, -1.0
+};
+
+// Define cube faces (indices into vertices array)
+GLuint faces[] = {
+    0, 1, 2, 3, // Front
+    3, 2, 6, 7, // Top
+    7, 6, 5, 4, // Back
+    4, 5, 1, 0, // Bottom
+    1, 5, 6, 2, // Right
+    4, 0, 3, 7  // Left
+};
+
+
+void display() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(5, 5, 5, 0, 0, 0, 0, 1, 0); // Camera position and look-at point
+
+
+    //Simulate two light sources.  This is a VERY basic approximation.
+    GLfloat light1_pos[] = {5.0f, 0.0f, 0.0f, 1.0f}; // Light source 1 position
+    GLfloat light2_pos[] = {0.0f, 0.0f, 5.0f, 1.0f}; // Light source 2 position
+
+    glBegin(GL_QUADS);
+    for (int i = 0; i < 24; i += 4) {
+        //Simple light simulation:  Brighter if face normal points towards either light.
+
+        GLfloat v1[3] = {vertices[faces[i]*3], vertices[faces[i]*3+1], vertices[faces[i]*3+2]};
+        GLfloat v2[3] = {vertices[faces[i+1]*3], vertices[faces[i+1]*3+1], vertices[faces[i+1]*3+2]};
+        GLfloat v3[3] = {vertices[faces[i+2]*3], vertices[faces[i+2]*3+1], vertices[faces[i+2]*3+2]};
+
+        GLfloat normal[3];
+        normal[0] = (v2[1] - v1[1]) * (v3[2] - v1[2]) - (v2[2] - v1[2]) * (v3[1] - v1[1]);
+        normal[1] = (v2[2] - v1[2]) * (v3[0] - v1[0]) - (v2[0] - v1[0]) * (v3[2] - v1[2]);
+        normal[2] = (v2[0] - v1[0]) * (v3[1] - v1[1]) - (v2[1] - v1[1]) * (v3[0] - v1[0]);
+
+
+        GLfloat lightIntensity1 = (normal[0] * light1_pos[0] + normal[1] * light1_pos[1] + normal[2] * light1_pos[2]) / (sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]));
+        GLfloat lightIntensity2 = (normal[0] * light2_pos[0] + normal[1] * light2_pos[1] + normal[2] * light2_pos[2]) / (sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]));
+
+        GLfloat intensity = 0.2 + 0.8 * (lightIntensity1 + lightIntensity2) / 2.0 ; // Combine and clamp
+        intensity = fmax(0.0f, fmin(1.0f, intensity)); //Keep between 0 and 1
+
+        glColor3f(intensity, intensity, intensity); // Simple grayscale lighting
+
+        glVertex3fv(&vertices[faces[i] * 3]);
+        glVertex3fv(&vertices[faces[i + 1] * 3]);
+        glVertex3fv(&vertices[faces[i + 2] * 3]);
+        glVertex3fv(&vertices[faces[i + 3] * 3]);
+    }
+    glEnd();
+
+    glutSwapBuffers();
+}
+
+void reshape(int w, int h) {
+    glViewport(0, 0, w, h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(45.0, (double)w / h, 1.0, 100.0); //Perspective projection
+}
+
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(800, 600);
+    glutCreateWindow("3D Cube");
+    glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutMainLoop();
+    return 0;
+}
