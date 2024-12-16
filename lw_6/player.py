@@ -19,7 +19,7 @@ class Player:
         for ix in range(-self.collision_radius, self.collision_radius + 1, TILE // 4):
             for iy in range(-self.collision_radius, self.collision_radius + 1, TILE // 4):
                 tile = ((x + ix) // TILE * TILE, (y + iy) // TILE * TILE)
-                if tile in world_map:  # Если в радиусе есть стена
+                if tile in world_map:
                     return False
         return True
 
@@ -28,9 +28,8 @@ class Player:
         cos_a = math.cos(self.angle)
         keys = pygame.key.get_pressed()
 
-        self.speed = 0  # Сброс скорости перед началом движения
-
-        # Проверяем перемещения вперед и назад
+        self.speed = 0
+        
         if keys[pygame.K_w]:
             new_x = self.x + player_speed * cos_a
             new_y = self.y + player_speed * sin_a
@@ -48,7 +47,6 @@ class Player:
                 self.y = new_y
             self.speed = player_speed
 
-        # Проверяем перемещения влево и вправо
         if keys[pygame.K_a]:
             new_x = self.x + player_speed * sin_a
             new_y = self.y - player_speed * cos_a
@@ -66,7 +64,6 @@ class Player:
                 self.y = new_y
             self.speed = player_speed
 
-        # Повороты
         if keys[pygame.K_LEFT]:
             self.angle -= player_angle_speed
         if keys[pygame.K_RIGHT]:
