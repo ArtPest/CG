@@ -1,0 +1,152 @@
+#include <SFML/Graphics.hpp>
+#include <cmath>
+
+sf::Vector2f bezier(float t, const sf::Vector2f& p0, const sf::Vector2f& p1, const sf::Vector2f& p2) {
+    float p = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
+    float q = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+    return sf::Vector2f(p, q);
+}
+
+sf::Vector2f interpolate(float t, const sf::Vector2f& A, const sf::Vector2f& B) {
+    return A + t * (B - A);
+}
+
+int main() {
+    sf::RenderWindow window(sf::VideoMode(800, 600), "Bezier Animation");
+    window.setFramerateLimit(60);
+
+    sf::CircleShape circle(20);
+    circle.setFillColor(sf::Color(127, 127, 255));
+
+    float speed = 0.01;
+    float t = 0.0;
+    bool forward = true;
+    short flag = 0;
+
+    sf::Vector2f p0(100, 500);
+    sf::Vector2f p1(400, 100);
+    sf::Vector2f p2(700, 500);
+
+    std::vector<sf::CircleShape> trail;
+
+    sf::VertexArray lines(sf::LinesStrip, 3);
+    lines[0].position = p0;
+    lines[1].position = p1;
+    lines[2].position = p2;
+    lines[0].color = sf::Color(127, 127, 127);
+    lines[1].color = sf::Color(127, 127, 127);
+    lines[2].color = sf::Color(127, 127, 127);
+
+    sf::CircleShape controlPoints[3];
+    for(int i = 0; i < 3; ++i) {
+        controlPoints[i].setRadius(5);
+        controlPoints[i].setFillColor(sf::Color(127, 127, 127));
+    }
+    controlPoints[0].setPosition(sf::Vector2f(p0.x - 5, p0.y - 5));
+    controlPoints[1].setPosition(sf::Vector2f(p1.x - 5, p1.y - 5));
+    controlPoints[2].setPosition(sf::Vector2f(p2.x - 5, p2.y - 5));
+
+    while (window.isOpen()) {
+        sf::Event event;
+
+        bool rightPressed = false;
+        bool leftPressed = false;
+
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                window.close();
+            if (event.type == sf::Event::KeyPressed) {
+                if (event.key.code == sf::Keyboard::Up)
+                    speed += 0.005;
+                if (event.key.code == sf::Keyboard::Down)
+                    speed = std::max(0.005, speed - 0.005);
+
+                if (event.key.code == sf::Keyboard::Right && !rightPressed) {
+                    flag = (flag == 0) ? 1 : 0;
+                    rightPressed = true;
+                }
+
+                if (event.key.code == sf::Keyboard::Left && !leftPressed) {
+                    flag = (flag == 0) ? -1 : 0;
+                    leftPressed = true;
+                }
+            }
+
+            if (event.type == sf::Event::KeyReleased) {
+                if (event.key.code == sf::Keyboard::Right) {
+                    rightPressed = false;
+                }
+                if (event.key.code == sf::Keyboard::Left) {
+                    leftPressed = false;
+                }
+            }
+        }
+
+        /*t += speed;
+        if (t > 1.0f)
+            t = 0.0f;*/
+
+        if (forward) {
+            t += speed;
+            if (t >= 1.0) {
+                t = 1.0;
+                forward = false;
+            }
+        } else {
+            t -= speed;
+            if (t <= 0.0) {
+                t = 0.0;
+                forward = true;
+            }
+        }
+
+        float radius = 20.0 + t * flag * 15;
+        sf::Vector2f position = bezier(t, p0, p1, p2);
+        circle.setPosition(position.x - radius, position.y - radius);
+        circle.setRadius(radius);
+
+        sf::CircleShape a;
+        a.setPosition(interpolate(t, p0, p1).x - 5, interpolate(t, p0, p1).y - 5);
+        a.setFillColor(sf::Color(127, 127, 127));
+        a.setRadius(5);
+
+        sf::CircleShape b;
+        b.setPosition(interpolate(t, p1, p2).x - 5, interpolate(t, p1, p2).y - 5);
+        b.setFillColor(sf::Color(127, 127, 127));
+        b.setRadius(5);
+
+        sf::CircleShape trailCircle(5);
+        trailCircle.setFillColor(sf::Color(127, 127, 255, 150));
+        trailCircle.setPosition(position.x - 5, position.y - 5);
+        trail.push_back(trailCircle);
+
+        if(t == 0.0 || t == 1.0)
+            trail.clear();
+
+
+        sf::VertexArray line(sf::PrimitiveType::Lines, 2);
+        line[0].position = a.getPosition() + sf::Vector2f(5, 5);
+        line[1].position = b.getPosition() + sf::Vector2f(5, 5);
+
+        line[0].color = sf::Color(127, 127, 127);
+        line[1].color = sf::Color(127, 127, 127);
+
+        window.clear();
+        window.draw(lines);
+
+        for(int i = 0; i < 3; ++i)
+            window.draw(controlPoints[i]);
+
+        window.draw(circle);
+        window.draw(a);
+        window.draw(b);
+
+        for (const auto& trailCircle: trail)
+            window.draw(trailCircle);
+
+        window.draw(line);
+        window.display();
+    }
+
+    return 0;
+}
