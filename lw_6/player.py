@@ -8,8 +8,9 @@ class Player:
     def __init__(self):
         self.x, self.y = player_pos
         self.angle = player_angle
-        self.collision_radius = TILE // 4  # Минимальное расстояние до стены
-
+        self.collision_radius = TILE // 4
+        self.speed = 0 
+        
     @property
     def pos(self):
         return (self.x, self.y)
@@ -27,6 +28,8 @@ class Player:
         cos_a = math.cos(self.angle)
         keys = pygame.key.get_pressed()
 
+        self.speed = 0  # Сброс скорости перед началом движения
+
         # Проверяем перемещения вперед и назад
         if keys[pygame.K_w]:
             new_x = self.x + player_speed * cos_a
@@ -35,6 +38,7 @@ class Player:
                 self.x = new_x
             if self.check_collision(self.x, new_y):
                 self.y = new_y
+            self.speed = player_speed
         if keys[pygame.K_s]:
             new_x = self.x - player_speed * cos_a
             new_y = self.y - player_speed * sin_a
@@ -42,6 +46,7 @@ class Player:
                 self.x = new_x
             if self.check_collision(self.x, new_y):
                 self.y = new_y
+            self.speed = player_speed
 
         # Проверяем перемещения влево и вправо
         if keys[pygame.K_a]:
@@ -51,6 +56,7 @@ class Player:
                 self.x = new_x
             if self.check_collision(self.x, new_y):
                 self.y = new_y
+            self.speed = player_speed
         if keys[pygame.K_d]:
             new_x = self.x - player_speed * sin_a
             new_y = self.y + player_speed * cos_a
@@ -58,6 +64,7 @@ class Player:
                 self.x = new_x
             if self.check_collision(self.x, new_y):
                 self.y = new_y
+            self.speed = player_speed
 
         # Повороты
         if keys[pygame.K_LEFT]:
